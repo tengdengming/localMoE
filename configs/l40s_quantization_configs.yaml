@@ -1,0 +1,273 @@
+# L40S GPU 量化配置集合
+# 针对不同模型大小和使用场景的优化配置
+
+# 基础配置
+base_config: &base_config
+  environment: production
+  debug: false
+  model_cache_dir: "./models"
+  log_dir: "./logs"
+  
+  # L40S GPU配置
+  gpu:
+    device_count: 4
+    memory_limit_gb: 48.0        # L40S显存容量
+    utilization_threshold: 0.85
+    temperature_threshold: 80.0  # L40S温度阈值
+    enable_monitoring: true
+    monitoring_interval: 1.0
+  
+  # API配置
+  api:
+    host: "0.0.0.0"
+    port: 8000
+    workers: 1
+    log_level: "info"
+    enable_cors: true
+
+# 配置1: 大模型 + AWQ量化 (推荐)
+large_model_awq: &large_model_awq
+  <<: *base_config
+  
+  model:
+    quantization_type: "awq"
+    max_sequence_length: 4096
+    enable_compilation: true
+  
+  vllm:
+    # 大模型示例
+    model_name: "TheBloke/Llama-2-70B-Chat-AWQ"
+    quantization: "awq"
+    
+    # 并行配置
+    tensor_parallel_size: 4
+    pipeline_parallel_size: 1
+    
+    # 内存配置 - 针对L40S优化
+    gpu_memory_utilization: 0.9   # AWQ量化后可以更激进
+    max_model_len: 4096
+    block_size: 32                # 适合L40S内存带宽
+    swap_space: 8
+    
+    # 批处理配置
+    max_num_batched_tokens: 16384
+    max_num_seqs: 256
+    max_paddings: 256
+    
+    # 性能优化
+    enable_prefix_caching: true
+    use_v2_block_manager: true
+    enable_chunked_prefill: true
+    max_chunked_prefill_tokens: 2048
+    
+    # 调度优化
+    scheduler_delay_factor: 0.0
+    load_format: "auto"
+
+# 配置2: 中等模型 + FP8量化 (L40S原生支持)
+medium_model_fp8: &medium_model_fp8
+  <<: *base_config
+  
+  model:
+    quantization_type: "fp8"
+    max_sequence_length: 8192
+    enable_compilation: true
+  
+  vllm:
+    # 中等模型示例
+    model_name: "meta-llama/Llama-2-13b-chat-hf"
+    quantization: "fp8"
+    kv_cache_dtype: "fp8_e5m2"   # KV缓存也使用FP8
+    
+    # 并行配置
+    tensor_parallel_size: 4
+    
+    # 内存配置
+    gpu_memory_utilization: 0.85
+    max_model_len: 8192           # 更长序列
+    block_size: 32
+    swap_space: 6
+    
+    # 批处理配置
+    max_num_batched_tokens: 24576 # 更大批处理
+    max_num_seqs: 512
+    
+    # 性能优化
+    enable_prefix_caching: true
+    use_v2_block_manager: true
+    enable_chunked_prefill: true
+    max_chunked_prefill_tokens: 4096
+
+# 配置3: 小模型 + 无量化 (最高质量)
+small_model_fp16: &small_model_fp16
+  <<: *base_config
+  
+  model:
+    quantization_type: "fp16"
+    max_sequence_length: 16384
+    enable_compilation: true
+  
+  vllm:
+    # 小模型示例
+    model_name: "mistralai/Mistral-7B-Instruct-v0.2"
+    quantization: null            # 不使用量化
+    
+    # 并行配置
+    tensor_parallel_size: 2       # 7B模型只需2张GPU
+    
+    # 内存配置
+    gpu_memory_utilization: 0.9
+    max_model_len: 16384          # 支持很长序列
+    block_size: 32
+    swap_space: 4
+    
+    # 批处理配置
+    max_num_batched_tokens: 65536 # 大批处理
+    max_num_seqs: 1024
+    
+    # 性能优化
+    enable_prefix_caching: true
+    use_v2_block_manager: true
+    enable_chunked_prefill: true
+
+# 配置4: 代码模型 + GPTQ量化
+code_model_gptq: &code_model_gptq
+  <<: *base_config
+  
+  model:
+    quantization_type: "gptq"
+    max_sequence_length: 8192
+    enable_compilation: true
+  
+  vllm:
+    # 代码模型示例
+    model_name: "TheBloke/CodeLlama-34B-Instruct-GPTQ"
+    quantization: "gptq"
+    
+    # 并行配置
+    tensor_parallel_size: 4
+    
+    # 内存配置
+    gpu_memory_utilization: 0.85
+    max_model_len: 8192
+    block_size: 32
+    swap_space: 8
+    
+    # 批处理配置 - 代码生成通常序列较长
+    max_num_batched_tokens: 16384
+    max_num_seqs: 128             # 较少并发，支持长序列
+    
+    # 性能优化
+    enable_prefix_caching: true   # 代码场景特别有用
+    use_v2_block_manager: true
+    scheduler_delay_factor: 0.0   # 代码生成需要低延迟
+
+# 配置5: 多模型并行部署
+multi_model_parallel: &multi_model_parallel
+  <<: *base_config
+  
+  # 模型实例配置
+  model_instances:
+    # 实例1: 聊天模型 (GPU 0-1)
+    chat_model:
+      model_name: "mistralai/Mistral-7B-Instruct-v0.2"
+      quantization: null
+      tensor_parallel_size: 2
+      gpu_devices: [0, 1]
+      max_model_len: 8192
+      gpu_memory_utilization: 0.9
+      
+    # 实例2: 代码模型 (GPU 2-3)
+    code_model:
+      model_name: "TheBloke/CodeLlama-13B-Instruct-AWQ"
+      quantization: "awq"
+      tensor_parallel_size: 2
+      gpu_devices: [2, 3]
+      max_model_len: 4096
+      gpu_memory_utilization: 0.9
+
+# 配置6: 高吞吐量配置
+high_throughput: &high_throughput
+  <<: *base_config
+  
+  model:
+    quantization_type: "awq"
+    max_sequence_length: 2048     # 较短序列，提高吞吐量
+    enable_compilation: true
+  
+  vllm:
+    model_name: "TheBloke/Llama-2-13B-Chat-AWQ"
+    quantization: "awq"
+    
+    # 并行配置
+    tensor_parallel_size: 4
+    
+    # 内存配置
+    gpu_memory_utilization: 0.9
+    max_model_len: 2048           # 较短序列
+    block_size: 16                # 较小块，提高并发
+    
+    # 批处理配置 - 优化吞吐量
+    max_num_batched_tokens: 32768 # 大批处理
+    max_num_seqs: 1024            # 高并发
+    max_paddings: 1024
+    
+    # 性能优化
+    enable_prefix_caching: true
+    use_v2_block_manager: true
+    scheduler_delay_factor: 0.1   # 稍微延迟以聚合更多请求
+
+# 配置7: 低延迟配置
+low_latency: &low_latency
+  <<: *base_config
+  
+  model:
+    quantization_type: "fp8"
+    max_sequence_length: 4096
+    enable_compilation: true
+  
+  vllm:
+    model_name: "mistralai/Mistral-7B-Instruct-v0.2"
+    quantization: "fp8"
+    
+    # 并行配置
+    tensor_parallel_size: 4       # 更多GPU并行，降低延迟
+    
+    # 内存配置
+    gpu_memory_utilization: 0.8   # 保守配置，确保稳定性
+    max_model_len: 4096
+    block_size: 32
+    
+    # 批处理配置 - 优化延迟
+    max_num_batched_tokens: 4096  # 较小批处理
+    max_num_seqs: 64              # 较少并发
+    
+    # 性能优化
+    enable_prefix_caching: true
+    use_v2_block_manager: true
+    enable_chunked_prefill: true
+    scheduler_delay_factor: 0.0   # 无延迟调度
+
+# 使用示例配置
+# 根据需求选择对应的配置
+configs:
+  # 生产环境推荐
+  production: *large_model_awq
+  
+  # 开发测试
+  development: *small_model_fp16
+  
+  # 代码生成
+  code_generation: *code_model_gptq
+  
+  # 高性能场景
+  high_performance: *medium_model_fp8
+  
+  # 多模型服务
+  multi_service: *multi_model_parallel
+  
+  # 高吞吐量场景
+  batch_processing: *high_throughput
+  
+  # 实时交互
+  real_time: *low_latency

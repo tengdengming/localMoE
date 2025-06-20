@@ -1,0 +1,170 @@
+# LocalMoE 生产环境配置
+# 针对4x L40S GPU优化的配置
+
+# 环境配置
+environment: production
+debug: false
+model_cache_dir: "./models"
+log_dir: "./logs"
+config_dir: "./configs"
+
+# GPU配置 - 针对4x L40S优化
+gpu:
+  device_count: 4
+  memory_limit_gb: 48.0          # L40S显存容量
+  utilization_threshold: 0.85    # 保守的利用率阈值
+  temperature_threshold: 80.0    # L40S温度阈值
+  enable_monitoring: true
+  monitoring_interval: 1.0
+
+# 模型配置 - MoE部分已注释掉
+model:
+  # MoE配置 (DeepSpeed已注释掉)
+  num_experts: 8                 # 专家数量 (未使用)
+  top_k_experts: 2              # 激活专家数量 (未使用)
+  hidden_size: 4096             # 增大隐藏层
+  intermediate_size: 11008      # 增大中间层
+  max_sequence_length: 4096     # 增大序列长度
+  quantization_type: "fp16"     # 使用FP16
+  enable_compilation: true
+
+# 推理配置
+inference:
+  preferred_engine: "vllm"      # 只使用vLLM
+  enable_fallback: false        # 关闭fallback
+  enable_load_balancing: true
+  max_concurrent_requests: 200  # 增加并发数
+  request_timeout: 60.0         # 增加超时时间
+  enable_batching: true
+  max_batch_size: 64           # 增加批处理大小
+  batch_timeout: 0.05          # 减少批处理等待时间
+
+# vLLM配置 - 针对L40S优化
+vllm:
+  # 模型选择 (根据需求选择)
+  model_name: "meta-llama/Llama-2-13b-chat-hf"  # 13B模型，平衡性能和资源
+  # model_name: "mistralai/Mistral-7B-Instruct-v0.2"  # 7B模型，高性能
+  # model_name: "codellama/CodeLlama-13b-Instruct-hf"  # 代码专用模型
+  # model_name: "./models/custom-model"  # 本地模型路径
+  
+  # 并行配置
+  tensor_parallel_size: 4       # 4张GPU张量并行
+  pipeline_parallel_size: 1    # 不使用流水线并行
+  
+  # 内存配置 - 针对L40S 48GB显存优化
+  gpu_memory_utilization: 0.85  # 保守的内存使用率
+  max_model_len: 4096           # 支持长序列
+  block_size: 32                # 增大块大小
+  swap_space: 8                 # 8GB交换空间
+  
+  # 批处理配置 - 充分利用L40S计算能力
+  max_num_batched_tokens: 16384  # 大批处理
+  max_num_seqs: 512             # 增加序列数
+  max_paddings: 512             # 增加填充数
+  
+  # 性能优化
+  enable_prefix_caching: true    # 启用前缀缓存
+  use_v2_block_manager: true     # 使用v2内存管理器
+  enable_chunked_prefill: true   # 启用分块预填充
+  max_chunked_prefill_tokens: 2048  # 分块大小
+  
+  # 量化配置 (可选)
+  quantization: null             # 不使用量化 (充分利用显存)
+  # quantization: "awq"          # AWQ量化 (节省显存)
+  # quantization: "gptq"         # GPTQ量化
+  load_format: "auto"
+  
+  # 推理配置
+  seed: 42
+  trust_remote_code: false       # 安全考虑
+  revision: null
+  
+  # 调度配置
+  scheduler_delay_factor: 0.0    # 无延迟调度
+  enable_lora: false             # 不使用LoRA
+  max_lora_rank: 16
+
+# API配置 - 生产环境优化
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1                     # vLLM建议单worker
+  reload: false                  # 生产环境不自动重载
+  log_level: "info"
+  enable_cors: true
+  enable_gzip: true
+  rate_limit_calls: 1000         # 增加限流
+  rate_limit_period: 60
+
+# 监控配置
+monitoring:
+  enable_prometheus: true
+  prometheus_port: 9090
+  enable_grafana: true
+  grafana_port: 3000
+  metrics_interval: 5.0          # 5秒收集一次指标
+  enable_health_check: true
+  health_check_interval: 30.0
+  log_performance: true
+  performance_log_interval: 60.0
+
+# 安全配置
+security:
+  enable_auth: false             # 内网环境可关闭
+  api_key_required: false
+  enable_rate_limiting: true
+  max_requests_per_minute: 1000
+  enable_request_logging: true
+  log_request_body: false        # 隐私考虑
+
+# 高级配置
+advanced:
+  # GPU拓扑优化 (针对L40S PCIe配置)
+  pcie_topology:
+    groups: [[0, 1], [2, 3]]     # GPU分组
+    bandwidth_matrix:            # 带宽矩阵 (GB/s)
+      - [0, 50, 25, 25]         # GPU0到其他GPU的带宽
+      - [50, 0, 25, 25]         # GPU1到其他GPU的带宽  
+      - [25, 25, 0, 50]         # GPU2到其他GPU的带宽
+      - [25, 25, 50, 0]         # GPU3到其他GPU的带宽
+  
+  # 内存管理
+  memory_management:
+    enable_memory_pool: true
+    pool_size_gb: 16
+    enable_garbage_collection: true
+    gc_interval: 300             # 5分钟GC一次
+  
+  # 性能调优
+  performance_tuning:
+    enable_torch_compile: true   # 启用PyTorch编译
+    enable_flash_attention: true # 启用Flash Attention
+    enable_xformers: true        # 启用xFormers
+    cuda_graphs: true            # 启用CUDA图优化
+
+# 模型特定配置
+model_configs:
+  "meta-llama/Llama-2-13b-chat-hf":
+    max_model_len: 4096
+    tensor_parallel_size: 4
+    gpu_memory_utilization: 0.85
+    
+  "mistralai/Mistral-7B-Instruct-v0.2":
+    max_model_len: 8192
+    tensor_parallel_size: 2      # 7B模型只需2张GPU
+    gpu_memory_utilization: 0.9
+    
+  "codellama/CodeLlama-13b-Instruct-hf":
+    max_model_len: 4096
+    tensor_parallel_size: 4
+    gpu_memory_utilization: 0.85
+    enable_prefix_caching: true  # 代码场景特别有用
+
+# 环境变量映射
+environment_variables:
+  CUDA_VISIBLE_DEVICES: "0,1,2,3"
+  NVIDIA_VISIBLE_DEVICES: "all"
+  PYTORCH_CUDA_ALLOC_CONF: "max_split_size_mb:512"
+  NCCL_DEBUG: "WARN"
+  NCCL_IB_DISABLE: "1"         # 禁用InfiniBand (如果没有)
+  OMP_NUM_THREADS: "32"        # 限制OpenMP线程数

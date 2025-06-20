@@ -1,0 +1,100 @@
+# LocalMoE 配置文件
+# 多模态MoE推理服务配置
+
+# 环境配置
+environment: development
+debug: true
+model_cache_dir: "./models"
+log_dir: "./logs"
+config_dir: "./configs"
+
+# GPU配置 - 针对L40S优化
+gpu:
+  device_count: 4
+  memory_limit_gb: 48.0          # L40S显存容量
+  utilization_threshold: 0.85
+  temperature_threshold: 80.0    # L40S温度阈值
+  enable_monitoring: true
+  monitoring_interval: 1.0
+
+# 模型配置 - 针对L40S优化
+model:
+  num_experts: 8                 # MoE专家数量 (已注释掉)
+  top_k_experts: 2              # 激活专家数量 (已注释掉)
+  hidden_size: 768
+  intermediate_size: 3072
+  max_sequence_length: 4096     # 增加序列长度，利用L40S大显存
+  quantization_type: "awq"      # 推荐AWQ量化，适合L40S
+  enable_compilation: true
+
+# 推理配置
+inference:
+  preferred_engine: "auto"
+  enable_fallback: true
+  enable_load_balancing: true
+  max_concurrent_requests: 100
+  request_timeout: 30.0
+  enable_batching: true
+  max_batch_size: 32
+  batch_timeout: 0.1
+
+# DeepSpeed配置 - 已注释掉
+# deepspeed:
+#   zero_stage: 3
+#   enable_expert_sharding: true
+#   expert_shard_size: 4
+#   cpu_offload: true
+#   nvme_offload: false
+#   nvme_offload_dir: "/tmp/deepspeed_nvme"
+#   enable_quantization: true
+#   quantization_bits: 8
+#   tensor_parallel_size: 4
+
+# vLLM配置 - 针对L40S优化
+vllm:
+  model_name: "microsoft/DialoGPT-medium"
+  tensor_parallel_size: 4
+  gpu_memory_utilization: 0.85  # L40S保守内存使用率
+  max_model_len: 4096           # 增加序列长度
+  block_size: 32                # 增大块大小，适合L40S内存带宽
+  swap_space: 8                 # 增加交换空间
+  max_num_batched_tokens: 16384 # 增大批处理，利用L40S计算能力
+  enable_prefix_caching: true   # 利用L40S大显存
+  quantization: "awq"           # AWQ量化，L40S最佳选择
+  use_v2_block_manager: true    # 启用v2内存管理器
+  enable_chunked_prefill: true  # 启用分块预填充
+  max_chunked_prefill_tokens: 2048  # 分块大小
+
+# API配置
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  reload: false
+  log_level: "info"
+  enable_cors: true
+  enable_gzip: true
+  rate_limit_calls: 100
+  rate_limit_period: 60
+
+# 监控配置
+monitoring:
+  enable_metrics: true
+  metrics_interval: 10.0
+  enable_prometheus: true
+  prometheus_port: 9090
+  enable_logging: true
+  log_file: "logs/localmoe.log"
+  log_rotation: true
+  log_max_size: "100MB"
+  log_backup_count: 5
+
+# 安全配置
+security:
+  enable_auth: false
+  jwt_secret_key: null
+  jwt_algorithm: "HS256"
+  jwt_expiration_hours: 24
+  enable_rate_limiting: true
+  enable_request_validation: true
+  max_request_size_mb: 10

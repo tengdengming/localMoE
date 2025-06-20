@@ -1,0 +1,257 @@
+# LocalMoE Linux生产环境配置
+# 针对4x L40S GPU + 376GB RAM + 128 CPU优化
+# DeepSpeed已注释掉，使用vLLM引擎
+
+# 环境配置
+environment: production
+debug: false
+model_cache_dir: "./models"
+log_dir: "./logs"
+config_dir: "./configs"
+
+# GPU配置 - L40S优化
+gpu:
+  device_count: 4
+  memory_limit_gb: 48.0          # L40S显存容量
+  utilization_threshold: 0.85    # 生产环境保守阈值
+  temperature_threshold: 80.0    # L40S温度阈值
+  enable_monitoring: true
+  monitoring_interval: 5.0       # 5秒监控间隔
+  power_limit: 300               # L40S功耗限制(W)
+
+# 模型配置
+model:
+  # MoE配置 (DeepSpeed已注释掉)
+  num_experts: 8                 # 专家数量 (未使用)
+  top_k_experts: 2              # 激活专家数量 (未使用)
+  hidden_size: 4096             # 增大隐藏层
+  intermediate_size: 11008      # 增大中间层
+  max_sequence_length: 4096     # 适中序列长度
+  quantization_type: "awq"      # L40S推荐量化
+  enable_compilation: true
+
+# 推理配置 - 生产环境优化
+inference:
+  preferred_engine: "vllm"      # 只使用vLLM
+  enable_fallback: false        # 关闭fallback
+  enable_load_balancing: true
+  max_concurrent_requests: 200  # 高并发支持
+  request_timeout: 120.0        # 增加超时时间
+  enable_batching: true
+  max_batch_size: 64           # 大批处理
+  batch_timeout: 0.1           # 批处理等待时间
+  enable_streaming: true       # 启用流式响应
+
+# vLLM配置 - L40S生产环境优化
+vllm:
+  # 模型选择 (根据需求调整)
+  model_name: "meta-llama/Llama-2-13b-chat-hf"  # 13B模型，平衡性能
+  # model_name: "mistralai/Mistral-7B-Instruct-v0.2"  # 7B高性能
+  # model_name: "TheBloke/Llama-2-70B-Chat-AWQ"  # 70B大模型(需要AWQ)
+  
+  # 并行配置
+  tensor_parallel_size: 4       # 4张L40S并行
+  pipeline_parallel_size: 1    # 不使用流水线并行
+  
+  # 内存配置 - L40S 48GB优化
+  gpu_memory_utilization: 0.85  # 生产环境保守配置
+  max_model_len: 4096           # 平衡长度和性能
+  block_size: 32                # 适合L40S内存带宽
+  swap_space: 8                 # 8GB交换空间
+  
+  # 批处理配置 - 高吞吐量
+  max_num_batched_tokens: 16384  # 大批处理
+  max_num_seqs: 256             # 高并发序列
+  max_paddings: 256             # 填充数量
+  
+  # 性能优化 - L40S特性
+  enable_prefix_caching: true    # 利用大显存
+  use_v2_block_manager: true     # v2内存管理器
+  enable_chunked_prefill: true   # 分块预填充
+  max_chunked_prefill_tokens: 2048  # 分块大小
+  
+  # 量化配置 - L40S推荐
+  quantization: "awq"            # AWQ量化，质量和性能平衡
+  # quantization: "fp8"          # FP8量化，L40S原生支持
+  # quantization: null           # 不量化，小模型可用
+  kv_cache_dtype: null           # 自动选择
+  load_format: "auto"
+  
+  # 推理配置
+  seed: 42
+  trust_remote_code: false       # 安全考虑
+  revision: null
+  
+  # 调度配置 - 生产环境优化
+  scheduler_delay_factor: 0.0    # 无延迟调度
+  enable_lora: false             # 不使用LoRA
+  max_lora_rank: 16
+
+# API配置 - 生产环境
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1                     # vLLM建议单worker
+  reload: false                  # 生产环境不自动重载
+  log_level: "info"
+  enable_cors: true
+  cors_origins: ["*"]            # 根据需要限制
+  enable_gzip: true
+  gzip_min_size: 1000
+  
+  # 限流配置
+  rate_limit_calls: 1000         # 每分钟1000次
+  rate_limit_period: 60
+  enable_rate_limiting: true
+  
+  # 超时配置
+  timeout_keep_alive: 5
+  timeout_graceful_shutdown: 30
+
+# 监控配置 - 生产环境
+monitoring:
+  enable_prometheus: true
+  prometheus_port: 9090
+  prometheus_path: "/metrics"
+  
+  enable_grafana: false          # 可选启用
+  grafana_port: 3000
+  
+  # 指标收集
+  metrics_interval: 10.0         # 10秒收集一次
+  enable_health_check: true
+  health_check_interval: 30.0
+  health_check_timeout: 10.0
+  
+  # 性能日志
+  log_performance: true
+  performance_log_interval: 60.0
+  log_gpu_stats: true
+  gpu_stats_interval: 30.0
+
+# 日志配置 - 生产环境
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # 文件日志
+  file_handler:
+    enabled: true
+    filename: "logs/localmoe.log"
+    max_bytes: 100000000          # 100MB
+    backup_count: 10
+    
+  # 错误日志
+  error_handler:
+    enabled: true
+    filename: "logs/error.log"
+    level: "ERROR"
+    max_bytes: 50000000           # 50MB
+    backup_count: 5
+    
+  # 访问日志
+  access_handler:
+    enabled: true
+    filename: "logs/access.log"
+    max_bytes: 200000000          # 200MB
+    backup_count: 15
+
+# 安全配置
+security:
+  enable_auth: false             # 内网环境可关闭
+  api_key_required: false
+  enable_request_logging: true
+  log_request_body: false        # 隐私考虑
+  enable_input_validation: true
+  max_input_length: 8192         # 最大输入长度
+  
+  # IP白名单 (可选)
+  enable_ip_whitelist: false
+  ip_whitelist: []
+
+# 高级配置 - L40S优化
+advanced:
+  # GPU拓扑优化
+  gpu_topology:
+    enable_optimization: true
+    pcie_groups: [[0, 1], [2, 3]]  # L40S PCIe分组
+    
+  # 内存管理
+  memory_management:
+    enable_memory_pool: true
+    pool_size_gb: 32              # 32GB内存池
+    enable_garbage_collection: true
+    gc_interval: 300              # 5分钟GC一次
+    gc_threshold: 0.8             # 80%内存使用率触发GC
+    
+  # 性能调优
+  performance_tuning:
+    enable_torch_compile: true    # PyTorch编译优化
+    enable_flash_attention: true # Flash Attention
+    enable_xformers: true         # xFormers优化
+    cuda_graphs: true             # CUDA图优化
+    enable_kernel_fusion: true   # 内核融合
+    
+  # 网络优化
+  network_optimization:
+    enable_tcp_nodelay: true
+    tcp_keepalive: true
+    socket_timeout: 60
+    max_connections: 1000
+
+# 模型特定配置
+model_configs:
+  # 13B模型配置 (推荐)
+  "meta-llama/Llama-2-13b-chat-hf":
+    quantization: "awq"
+    max_model_len: 4096
+    tensor_parallel_size: 4
+    gpu_memory_utilization: 0.85
+    max_num_batched_tokens: 16384
+    
+  # 7B模型配置 (高性能)
+  "mistralai/Mistral-7B-Instruct-v0.2":
+    quantization: null            # 不量化
+    max_model_len: 8192
+    tensor_parallel_size: 2       # 只需2张GPU
+    gpu_memory_utilization: 0.9
+    max_num_batched_tokens: 32768
+    
+  # 70B模型配置 (大模型)
+  "TheBloke/Llama-2-70B-Chat-AWQ":
+    quantization: "awq"
+    max_model_len: 4096
+    tensor_parallel_size: 4
+    gpu_memory_utilization: 0.9
+    max_num_batched_tokens: 8192
+
+# 环境变量映射
+environment_variables:
+  CUDA_VISIBLE_DEVICES: "0,1,2,3"
+  NVIDIA_VISIBLE_DEVICES: "all"
+  PYTORCH_CUDA_ALLOC_CONF: "max_split_size_mb:512"
+  NCCL_DEBUG: "WARN"
+  NCCL_IB_DISABLE: "1"
+  OMP_NUM_THREADS: "32"
+  TOKENIZERS_PARALLELISM: "false"
+
+# 健康检查配置
+health_check:
+  enabled: true
+  endpoint: "/health"
+  interval: 30
+  timeout: 10
+  retries: 3
+  
+  # 检查项目
+  checks:
+    - name: "gpu_memory"
+      threshold: 0.95             # GPU内存使用率阈值
+    - name: "system_memory"
+      threshold: 0.9              # 系统内存使用率阈值
+    - name: "gpu_temperature"
+      threshold: 85               # GPU温度阈值
+    - name: "model_loaded"
+      required: true              # 模型必须加载成功
+    - name: "inference_latency"
+      threshold: 5.0              # 推理延迟阈值(秒)
