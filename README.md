@@ -1,6 +1,10 @@
-# LocalMoE - 多模态MoE推理服务
+# LocalMoE - 高性能多模态推理服务
 
-基于DeepSpeed+vLLM的高性能多模态Mixture of Experts推理服务，支持文本和编码模态的智能路由和推理。
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![CUDA 12.1+](https://img.shields.io/badge/CUDA-12.1+-green.svg)](https://developer.nvidia.com/cuda-downloads)
+
+LocalMoE是一个基于vLLM引擎的高性能多模态推理服务，专门针对NVIDIA L40S GPU优化，支持大规模语言模型的高效推理。
 
 ## 系统架构
 
