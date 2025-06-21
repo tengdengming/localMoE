@@ -3,7 +3,7 @@ API数据模型定义
 定义请求和响应的数据结构
 """
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Dict, List, Optional, Any, Union
 from enum import Enum
 import time
@@ -45,27 +45,26 @@ class InferenceRequest(BaseModel):
     model_config: Optional[ModelConfig] = Field(default=None, description="模型配置")
     request_id: Optional[str] = Field(default=None, description="请求ID")
     
-    @validator('text', 'code')
-    def validate_input(cls, v, values):
-        """验证输入"""
-        if not values.get('text') and not values.get('code'):
+    @model_validator(mode='after')
+    def validate_input_and_mode(self):
+        """验证输入和模式"""
+        text = self.text
+        code = self.code
+        mode = self.mode
+
+        # 验证至少有一个输入
+        if not text and not code:
             raise ValueError("至少需要提供text或code中的一个")
-        return v
-    
-    @validator('mode')
-    def validate_mode(cls, v, values):
-        """验证推理模式"""
-        text = values.get('text')
-        code = values.get('code')
-        
-        if v == InferenceMode.TEXT_ONLY and not text:
+
+        # 验证模式匹配
+        if mode == InferenceMode.TEXT_ONLY and not text:
             raise ValueError("TEXT_ONLY模式需要提供text")
-        if v == InferenceMode.CODE_ONLY and not code:
+        if mode == InferenceMode.CODE_ONLY and not code:
             raise ValueError("CODE_ONLY模式需要提供code")
-        if v == InferenceMode.MULTIMODAL and not (text and code):
+        if mode == InferenceMode.MULTIMODAL and not (text and code):
             raise ValueError("MULTIMODAL模式需要同时提供text和code")
-        
-        return v
+
+        return self
 
 
 class ExpertInfo(BaseModel):
@@ -101,7 +100,8 @@ class BatchInferenceRequest(BaseModel):
     requests: List[InferenceRequest] = Field(description="推理请求列表")
     batch_size: Optional[int] = Field(default=None, description="批次大小")
     
-    @validator('requests')
+    @field_validator('requests')
+    @classmethod
     def validate_requests(cls, v):
         if not v:
             raise ValueError("请求列表不能为空")
@@ -159,7 +159,8 @@ class ConfigUpdateRequest(BaseModel):
     config_type: str = Field(description="配置类型")
     config_data: Dict[str, Any] = Field(description="配置数据")
     
-    @validator('config_type')
+    @field_validator('config_type')
+    @classmethod
     def validate_config_type(cls, v):
         allowed_types = ["sampling", "model", "system", "expert"]
         if v not in allowed_types:
