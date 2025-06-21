@@ -1,0 +1,4 @@
+# 环境扫描脚本依赖包
+# 用于运行 environment_scan.py
+
+psutil>=5.9.0
