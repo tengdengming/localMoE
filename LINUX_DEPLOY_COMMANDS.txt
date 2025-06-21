@@ -1,0 +1,137 @@
+# LocalMoE Linux服务器部署命令
+
+## 一键部署命令 (复制粘贴到Linux服务器)
+
+# 1. 克隆GitHub仓库
+git clone https://github.com/tengdengming/localMoE.git
+cd localMoE
+
+# 2. 执行一键部署
+chmod +x deploy_linux_server.sh
+./deploy_linux_server.sh
+
+# 3. 启动服务
+sudo systemctl start localmoe
+
+# 4. 查看状态
+sudo systemctl status localmoe
+
+# 5. 测试API
+curl http://localhost:8000/health
+
+## 手动部署命令 (如果需要自定义)
+
+# 1. 系统依赖安装 (Ubuntu)
+sudo apt-get update
+sudo apt-get install -y build-essential python3-dev python3-pip python3-venv git wget curl htop nvtop tmux vim
+
+# 2. 创建Python环境
+python3 -m venv venv
+source venv/bin/activate
+
+# 3. 安装PyTorch (CUDA 12.1)
+pip install --upgrade pip
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# 4. 安装项目依赖
+pip install -r requirements.txt
+pip install vllm>=0.2.0
+pip install flash-attn xformers triton pynvml zstandard transformers accelerate
+
+# 5. 创建目录和环境变量
+mkdir -p logs models checkpoints data
+export PYTHONPATH=$(pwd)
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+
+# 6. 测试安装
+python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}, GPUs: {torch.cuda.device_count()}')"
+python -c "import vllm; print('vLLM OK')"
+
+# 7. 启动服务
+python -m src.api.main
+
+## 服务管理命令
+
+# 启动服务
+sudo systemctl start localmoe
+
+# 停止服务
+sudo systemctl stop localmoe
+
+# 重启服务
+sudo systemctl restart localmoe
+
+# 查看状态
+sudo systemctl status localmoe
+
+# 查看日志
+sudo journalctl -u localmoe -f
+
+# 开机自启
+sudo systemctl enable localmoe
+
+## 监控命令
+
+# GPU监控
+nvidia-smi
+watch -n 1 nvidia-smi
+
+# 系统监控
+htop
+free -h
+df -h
+
+# 网络监控
+netstat -tlnp | grep 8000
+
+# API测试
+curl http://localhost:8000/health
+curl http://localhost:8000/docs
+
+## 故障排除命令
+
+# 检查GPU
+nvidia-smi --query-gpu=name,memory.used,memory.total,temperature.gpu --format=csv
+
+# 检查端口
+netstat -tlnp | grep 8000
+ss -tlnp | grep 8000
+
+# 检查进程
+ps aux | grep python
+
+# 重新安装依赖
+rm -rf venv
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 查看详细错误
+sudo journalctl -u localmoe --no-pager -n 50
+
+## 配置文件路径
+
+# 主配置文件
+configs/config.yaml
+
+# L40S优化配置
+configs/l40s_quantization_configs.yaml
+
+# 生产环境配置
+configs/production_linux.yaml
+
+# 环境变量
+.env
+
+## 重要提醒
+
+1. 确保NVIDIA驱动已安装 (版本 >= 525.xx)
+2. 确保有足够的磁盘空间 (至少2TB)
+3. 确保网络连接正常 (可访问PyPI和HuggingFace)
+4. DeepSpeed已被注释掉，只使用vLLM引擎
+5. 配置已针对L40S GPU优化
+6. 支持AWQ/FP8量化，充分利用硬件特性
+
+## GitHub仓库地址
+
+https://github.com/tengdengming/localMoE.git
