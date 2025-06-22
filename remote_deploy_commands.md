@@ -111,6 +111,9 @@ curl -X POST "http://localhost:8000/v1/inference" \
 ## 🔧 常用管理命令
 
 ```bash
+# 安装aria2下载工具
+sudo apt-get update && sudo apt-get install -y aria2
+
 # 启动服务 (后台运行)
 nohup python -m src.api.main > logs/service.log 2>&1 &
 

@@ -145,9 +145,11 @@ class ModelDownloader:
 
             # 尝试常见的分片模式
             for i in range(1, 21):  # 尝试 1-20 个分片
-                for pattern in [f"model-{i:05d}-of-*.safetensors", f"model-{i:05d}-of-*.bin"]:
+                for pattern in [f"model-{i:05d}-of-*.safetensors", f"model-{i:05d}-of-*.bin",
+                              f"model-{i:05d}-of-*.safetensors", f"model-{i:05d}-of-*.bin",
+                              f"model-{i:05d}-of-*.safetensors", f"model-{i:05d}-of-*.bin"]:
                     # 先尝试一些常见的总数
-                    for total in [10, 15, 20, 25, 30]:
+                    for total in [10, 15, 20, 25, 30, 35, 40, 45, 50]:
                         if pattern.endswith('.safetensors'):
                             filename = f"model-{i:05d}-of-{total:05d}.safetensors"
                         else:
@@ -221,7 +223,9 @@ class ModelDownloader:
 
         if not weight_files_found:
             self.log("WARNING", "No weight files found, trying single model files...")
-            single_model_files = ['model.safetensors', 'pytorch_model.bin']
+            single_model_files = ['model.safetensors', 'pytorch_model.bin', 
+                                'model.safetensors', 'pytorch_model.bin',
+                                'model-00001-of-00001.safetensors']
             for filename in single_model_files:
                 url = f"{self.base_url}/{model_name}/resolve/main/{filename}"
                 try:
@@ -249,6 +253,10 @@ class ModelDownloader:
         file_url = file_info['url']
         file_size = file_info.get('size', 0)
         
+        # 特殊处理Qwen模型的URL
+        if 'Qwen' in file_url and not file_url.startswith('http'):
+            file_url = f"https://huggingface.co/{file_url.split('resolve/main/')[0]}/resolve/main/{file_path}"
+            
         self.log("DOWNLOAD", f"Downloading {file_path} ({self._format_size(file_size)})")
         
         # aria2c 参数
