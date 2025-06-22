@@ -18,6 +18,13 @@ class InferenceMode(str, Enum):
     AUTO = "auto"
 
 
+class InferenceEngine(str, Enum):
+    """推理引擎类型"""
+    DEEPSPEED = "deepspeed"
+    VLLM = "vllm"
+    AUTO = "auto"
+
+
 class SamplingParams(BaseModel):
     """采样参数"""
     temperature: float = Field(default=0.8, description="采样温度")
