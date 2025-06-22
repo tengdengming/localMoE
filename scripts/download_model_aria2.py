@@ -57,64 +57,190 @@ class ModelDownloader:
     def get_model_files(self, model_name: str) -> List[Dict]:
         """获取模型文件列表"""
         self.log("INFO", f"Getting file list for {model_name}...")
-        
+
+        # 对于镜像，使用专门的方法
+        if self.use_mirror:
+            return self._get_files_from_mirror(model_name)
+
         # HuggingFace API URL
         api_url = f"https://huggingface.co/api/models/{model_name}/tree/main"
-        if self.use_mirror:
-            # 对于镜像，我们需要不同的方法
-            return self._get_files_from_mirror(model_name)
-            
+
         try:
             response = requests.get(api_url, timeout=30)
             response.raise_for_status()
             files = response.json()
-            
+
             # 过滤出需要下载的文件
             download_files = []
             for item in files:
                 if item.get('type') == 'file':
                     file_path = item.get('path', '')
-                    # 下载模型权重、配置文件等
-                    if any(file_path.endswith(ext) for ext in 
-                          ['.bin', '.safetensors', '.json', '.txt', '.py', '.md', '.model']):
+                    # 下载模型权重、配置文件等，包括分片文件
+                    if any(file_path.endswith(ext) for ext in
+                          ['.bin', '.safetensors', '.json', '.txt', '.py', '.md', '.model']) or \
+                       'model-' in file_path or 'pytorch_model' in file_path:
                         download_files.append({
                             'path': file_path,
                             'size': item.get('size', 0),
                             'url': f"{self.base_url}/{model_name}/resolve/main/{file_path}"
                         })
-                        
+
             self.log("SUCCESS", f"Found {len(download_files)} files to download")
+
+            # 显示文件大小统计
+            total_size = sum(f.get('size', 0) for f in download_files)
+            self.log("INFO", f"Total download size: {self._format_size(total_size)}")
+
             return download_files
-            
+
         except Exception as e:
             self.log("ERROR", f"Failed to get file list: {e}")
-            return []
+            self.log("INFO", "Falling back to mirror method...")
+            return self._get_files_from_mirror(model_name)
             
     def _get_files_from_mirror(self, model_name: str) -> List[Dict]:
-        """从镜像站获取文件列表（简化版）"""
-        # 常见的模型文件
-        common_files = [
-            'config.json', 'tokenizer.json', 'tokenizer_config.json',
-            'special_tokens_map.json', 'vocab.txt', 'merges.txt',
-            'pytorch_model.bin', 'model.safetensors', 'README.md'
-        ]
-        
+        """从镜像站获取文件列表（增强版）"""
+        self.log("INFO", "Getting file list from mirror...")
+
         files = []
-        for filename in common_files:
+
+        # 首先尝试获取 index.json 来了解模型结构
+        index_url = f"{self.base_url}/{model_name}/resolve/main/model.safetensors.index.json"
+        try:
+            response = requests.get(index_url, timeout=30)
+            if response.status_code == 200:
+                index_data = response.json()
+                weight_map = index_data.get('weight_map', {})
+                # 获取所有权重文件
+                weight_files = set(weight_map.values())
+                self.log("SUCCESS", f"Found {len(weight_files)} weight files from index")
+
+                for weight_file in weight_files:
+                    url = f"{self.base_url}/{model_name}/resolve/main/{weight_file}"
+                    try:
+                        head_resp = requests.head(url, timeout=10)
+                        if head_resp.status_code == 200:
+                            size = int(head_resp.headers.get('content-length', 0))
+                            files.append({
+                                'path': weight_file,
+                                'size': size,
+                                'url': url
+                            })
+                            self.log("INFO", f"Added weight file: {weight_file} ({self._format_size(size)})")
+                    except Exception as e:
+                        self.log("WARNING", f"Failed to check {weight_file}: {e}")
+                        continue
+
+                # 添加 index 文件本身
+                files.append({
+                    'path': 'model.safetensors.index.json',
+                    'size': len(response.content),
+                    'url': index_url
+                })
+
+        except Exception as e:
+            self.log("WARNING", f"Could not get model index: {e}")
+            # 如果没有 index，尝试猜测分片文件
+            self.log("INFO", "Trying to detect model files by pattern...")
+
+            # 尝试常见的分片模式
+            for i in range(1, 21):  # 尝试 1-20 个分片
+                for pattern in [f"model-{i:05d}-of-*.safetensors", f"model-{i:05d}-of-*.bin"]:
+                    # 先尝试一些常见的总数
+                    for total in [10, 15, 20, 25, 30]:
+                        if pattern.endswith('.safetensors'):
+                            filename = f"model-{i:05d}-of-{total:05d}.safetensors"
+                        else:
+                            filename = f"model-{i:05d}-of-{total:05d}.bin"
+
+                        url = f"{self.base_url}/{model_name}/resolve/main/{filename}"
+                        try:
+                            head_resp = requests.head(url, timeout=5)
+                            if head_resp.status_code == 200:
+                                size = int(head_resp.headers.get('content-length', 0))
+                                files.append({
+                                    'path': filename,
+                                    'size': size,
+                                    'url': url
+                                })
+                                self.log("SUCCESS", f"Found model file: {filename}")
+                                # 找到一个分片后，继续查找同一总数的其他分片
+                                for j in range(i+1, total+1):
+                                    if pattern.endswith('.safetensors'):
+                                        next_filename = f"model-{j:05d}-of-{total:05d}.safetensors"
+                                    else:
+                                        next_filename = f"model-{j:05d}-of-{total:05d}.bin"
+                                    next_url = f"{self.base_url}/{model_name}/resolve/main/{next_filename}"
+                                    try:
+                                        next_resp = requests.head(next_url, timeout=5)
+                                        if next_resp.status_code == 200:
+                                            next_size = int(next_resp.headers.get('content-length', 0))
+                                            files.append({
+                                                'path': next_filename,
+                                                'size': next_size,
+                                                'url': next_url
+                                            })
+                                            self.log("SUCCESS", f"Found model file: {next_filename}")
+                                    except:
+                                        continue
+                                break
+                        except:
+                            continue
+                    if files:  # 如果找到了文件，跳出循环
+                        break
+                if files:
+                    break
+
+        # 添加配置和其他必要文件
+        essential_files = [
+            'config.json', 'tokenizer.json', 'tokenizer_config.json',
+            'special_tokens_map.json', 'vocab.txt', 'merges.txt', 'vocab.json',
+            'generation_config.json', 'README.md'
+        ]
+
+        for filename in essential_files:
             url = f"{self.base_url}/{model_name}/resolve/main/{filename}"
-            # 检查文件是否存在
             try:
                 response = requests.head(url, timeout=10)
                 if response.status_code == 200:
                     size = int(response.headers.get('content-length', 0))
-                    files.append({
-                        'path': filename,
-                        'size': size,
-                        'url': url
-                    })
+                    # 避免重复添加
+                    if not any(f['path'] == filename for f in files):
+                        files.append({
+                            'path': filename,
+                            'size': size,
+                            'url': url
+                        })
+                        self.log("INFO", f"Added essential file: {filename}")
             except:
                 continue
-                
+
+        # 如果仍然没有找到权重文件，尝试单个模型文件
+        weight_files_found = any('safetensors' in f['path'] or 'bin' in f['path']
+                               for f in files if 'index' not in f['path'])
+
+        if not weight_files_found:
+            self.log("WARNING", "No weight files found, trying single model files...")
+            single_model_files = ['model.safetensors', 'pytorch_model.bin']
+            for filename in single_model_files:
+                url = f"{self.base_url}/{model_name}/resolve/main/{filename}"
+                try:
+                    response = requests.head(url, timeout=10)
+                    if response.status_code == 200:
+                        size = int(response.headers.get('content-length', 0))
+                        files.append({
+                            'path': filename,
+                            'size': size,
+                            'url': url
+                        })
+                        self.log("SUCCESS", f"Found single model file: {filename}")
+                        break
+                except:
+                    continue
+
+        total_size = sum(f.get('size', 0) for f in files)
+        self.log("SUCCESS", f"Total files found: {len(files)}, Total size: {self._format_size(total_size)}")
+
         return files
         
     def download_file_aria2(self, file_info: Dict, output_dir: Path) -> bool:
