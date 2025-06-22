@@ -21,7 +21,7 @@ from .routes import inference, monitoring, management
 from .middleware import RequestLoggingMiddleware, RateLimitMiddleware
 from .dependencies import get_inference_manager, get_config_manager
 from ..core.inference import InferenceManager, InferenceConfig
-from ..core.multimodal import FeatureExtractor, FeatureExtractorConfig
+from src.core.multimodal import FeatureExtractor, FeatureExtractorConfig
 
 # 配置日志
 logging.basicConfig(
