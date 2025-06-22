@@ -212,3 +212,66 @@ class SuccessResponse(BaseModel):
     message: str = Field(description="消息")
     data: Optional[Dict[str, Any]] = Field(default=None, description="数据")
     timestamp: float = Field(default_factory=time.time, description="时间戳")
+
+
+# 新增模型类
+class ExpertInfo(BaseModel):
+    """专家信息"""
+    expert_id: int = Field(description="专家ID")
+    device_id: int = Field(description="设备ID")
+    load: float = Field(description="负载")
+    memory_usage: float = Field(description="内存使用")
+    active: bool = Field(description="是否激活")
+
+
+class InferenceResult(BaseModel):
+    """推理结果"""
+    generated_text: str = Field(description="生成的文本")
+    input_tokens: int = Field(description="输入token数")
+    output_tokens: int = Field(description="输出token数")
+    inference_time_ms: float = Field(description="推理时间(毫秒)")
+    experts_used: List[int] = Field(default_factory=list, description="使用的专家")
+    model_info: Dict[str, Any] = Field(default_factory=dict, description="模型信息")
+
+
+class InferenceResponse(BaseModel):
+    """推理响应"""
+    success: bool = Field(description="是否成功")
+    request_id: str = Field(description="请求ID")
+    result: Optional[InferenceResult] = Field(default=None, description="推理结果")
+    error: Optional[str] = Field(default=None, description="错误信息")
+    timestamp: float = Field(default_factory=time.time, description="时间戳")
+
+
+class BatchInferenceResponse(BaseModel):
+    """批量推理响应"""
+    success: bool = Field(description="是否成功")
+    results: List[InferenceResponse] = Field(description="推理结果列表")
+    batch_info: Dict[str, Any] = Field(description="批次信息")
+    total_time_ms: float = Field(description="总时间(毫秒)")
+
+
+class ExpertStatus(BaseModel):
+    """专家状态"""
+    expert_id: int = Field(description="专家ID")
+    device_id: int = Field(description="设备ID")
+    status: str = Field(description="状态")
+    load: float = Field(description="负载")
+    memory_usage_gb: float = Field(description="内存使用(GB)")
+    request_count: int = Field(description="请求数量")
+    avg_latency_ms: float = Field(description="平均延迟(毫秒)")
+
+
+class ExpertStatusResponse(BaseModel):
+    """专家状态响应"""
+    experts: List[ExpertStatus] = Field(description="专家状态列表")
+    total_experts: int = Field(description="专家总数")
+    active_experts: int = Field(description="活跃专家数")
+
+
+class SystemMetrics(BaseModel):
+    """系统指标"""
+    cpu_usage: float = Field(description="CPU使用率")
+    memory_usage: float = Field(description="内存使用率")
+    gpu_usage: List[float] = Field(description="GPU使用率")
+    disk_usage: float = Field(description="磁盘使用率")

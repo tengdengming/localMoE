@@ -17,11 +17,9 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from .models import *
-from .routes import inference, monitoring, management
-from .middleware import RequestLoggingMiddleware, RateLimitMiddleware
-from .dependencies import get_inference_manager, get_config_manager
-from ..core.inference import InferenceManager, InferenceConfig
-from src.core.multimodal import FeatureExtractor, FeatureExtractorConfig
+from .routes import monitoring, management
+from .routes.inference_new import router as inference_router
+from ..core.inference.manager import inference_manager
 
 # 配置日志
 logging.basicConfig(
@@ -44,38 +42,33 @@ app_state = {
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时初始化
-    logger.info("Initializing LocalMoE service...")
-    
+    logger.info("🚀 初始化LocalMoE服务...")
+
     try:
-        # 初始化特征提取器
-        feature_config = FeatureExtractorConfig()
-        app_state["feature_extractor"] = FeatureExtractor(feature_config)
-        logger.info("Feature extractor initialized")
-        
         # 初始化推理管理器
-        inference_config = InferenceConfig()
-        app_state["inference_manager"] = InferenceManager(
-            config=inference_config,
-            # deepspeed_config=None,  # DeepSpeed已注释掉
-            vllm_config=None       # 将在实际部署时配置
-        )
-        logger.info("Inference manager initialized")
-        
-        logger.info("LocalMoE service started successfully")
-        
+        success = await inference_manager.initialize()
+        if success:
+            app_state["inference_manager"] = inference_manager
+            logger.info("✅ 推理管理器初始化成功")
+        else:
+            logger.error("❌ 推理管理器初始化失败")
+            raise RuntimeError("Failed to initialize inference manager")
+
+        logger.info("🎉 LocalMoE服务启动成功")
+
     except Exception as e:
-        logger.error(f"Failed to initialize service: {e}")
+        logger.error(f"❌ 服务初始化失败: {e}")
         raise
-    
+
     yield
-    
+
     # 关闭时清理
-    logger.info("Shutting down LocalMoE service...")
-    
-    if app_state["inference_manager"]:
-        app_state["inference_manager"].cleanup()
-    
-    logger.info("LocalMoE service stopped")
+    logger.info("🛑 关闭LocalMoE服务...")
+
+    if inference_manager.is_available:
+        await inference_manager.shutdown()
+
+    logger.info("✅ LocalMoE服务已停止")
 
 
 # 创建FastAPI应用
@@ -99,8 +92,8 @@ app.add_middleware(
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
-app.add_middleware(RequestLoggingMiddleware)
-app.add_middleware(RateLimitMiddleware, calls=100, period=60)
+# app.add_middleware(RequestLoggingMiddleware)  # 暂时注释掉
+# app.add_middleware(RateLimitMiddleware, calls=100, period=60)  # 暂时注释掉
 
 
 # 异常处理器
@@ -115,7 +108,7 @@ async def http_exception_handler(request, exc):
             error=exc.detail,
             error_code=f"HTTP_{exc.status_code}",
             request_id=getattr(request.state, "request_id", None)
-        ).dict()
+        ).model_dump()
     )
 
 
@@ -132,7 +125,7 @@ async def general_exception_handler(request, exc):
             error_code="INTERNAL_ERROR",
             details={"exception_type": type(exc).__name__},
             request_id=getattr(request.state, "request_id", None)
-        ).dict()
+        ).model_dump()
     )
 
 
@@ -182,23 +175,25 @@ async def readiness_check():
 
 
 # 包含路由
-app.include_router(
-    inference.router,
-    prefix="/v1",
-    tags=["inference"]
-)
+app.include_router(inference_router)
 
-app.include_router(
-    monitoring.router,
-    prefix="/v1",
-    tags=["monitoring"]
-)
+try:
+    app.include_router(
+        monitoring.router,
+        prefix="/v1",
+        tags=["monitoring"]
+    )
+except:
+    logger.warning("监控路由加载失败，跳过")
 
-app.include_router(
-    management.router,
-    prefix="/v1",
-    tags=["management"]
-)
+try:
+    app.include_router(
+        management.router,
+        prefix="/v1",
+        tags=["management"]
+    )
+except:
+    logger.warning("管理路由加载失败，跳过")
 
 
 # 中间件函数
