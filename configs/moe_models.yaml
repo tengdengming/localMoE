@@ -1,0 +1,145 @@
+# vLLM MoE模型配置文件
+# 针对4x L40S GPU (179GB总显存) 优化
+
+models:
+  # Mixtral系列 - 推荐用于生产环境
+  mixtral-8x7b:
+    model_name: "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    model_size: "~45GB"
+    recommended_gpus: 2
+    tensor_parallel_size: 2
+    pipeline_parallel_size: 1
+    max_model_len: 32768
+    gpu_memory_utilization: 0.85
+    quantization: null
+    dtype: "bfloat16"
+    description: "Mixtral 8x7B MoE模型，平衡性能和质量"
+    
+  mixtral-8x22b:
+    model_name: "mistralai/Mixtral-8x22B-Instruct-v0.1"
+    model_size: "~140GB"
+    recommended_gpus: 4
+    tensor_parallel_size: 4
+    pipeline_parallel_size: 1
+    max_model_len: 65536
+    gpu_memory_utilization: 0.80
+    quantization: null
+    dtype: "bfloat16"
+    description: "Mixtral 8x22B大型MoE模型，最高质量"
+
+  # DeepSeek系列
+  deepseek-moe-16b:
+    model_name: "deepseek-ai/deepseek-moe-16b-chat"
+    model_size: "~30GB"
+    recommended_gpus: 1
+    tensor_parallel_size: 1
+    pipeline_parallel_size: 1
+    max_model_len: 4096
+    gpu_memory_utilization: 0.85
+    quantization: null
+    dtype: "bfloat16"
+    description: "DeepSeek MoE 16B模型，中文友好"
+
+  # Qwen系列
+  qwen-moe-a2_7b:
+    model_name: "Qwen/Qwen1.5-MoE-A2.7B-Chat"
+    model_size: "~15GB"
+    recommended_gpus: 1
+    tensor_parallel_size: 1
+    pipeline_parallel_size: 1
+    max_model_len: 8192
+    gpu_memory_utilization: 0.85
+    quantization: null
+    dtype: "bfloat16"
+    description: "Qwen MoE A2.7B模型，轻量级选择"
+
+  # Switch Transformer (实验性)
+  switch-base:
+    model_name: "google/switch-base-8"
+    model_size: "~7GB"
+    recommended_gpus: 1
+    tensor_parallel_size: 1
+    pipeline_parallel_size: 1
+    max_model_len: 2048
+    gpu_memory_utilization: 0.85
+    quantization: null
+    dtype: "float16"
+    description: "Switch Transformer Base模型，研究用途"
+
+# 硬件配置
+hardware:
+  total_gpus: 4
+  gpu_model: "NVIDIA L40S"
+  gpu_memory_per_device: "48GB"
+  total_gpu_memory: "192GB"
+  system_memory: "376GB"
+  cpu_cores: 128
+
+# 全局配置
+global_settings:
+  # 性能优化
+  enable_chunked_prefill: true
+  max_num_batched_tokens: 8192
+  max_num_seqs: 256
+  
+  # 内存优化
+  block_size: 16
+  swap_space: 4  # GB
+  
+  # 并行配置
+  worker_use_ray: false
+  engine_use_ray: false
+  
+  # 量化选项
+  supported_quantizations:
+    - null
+    - "awq"
+    - "gptq"
+    - "fp8"
+  
+  # 数据类型
+  supported_dtypes:
+    - "float16"
+    - "bfloat16"
+    - "float32"
+
+# 部署场景配置
+deployment_scenarios:
+  development:
+    description: "开发测试环境"
+    max_model_len: 4096
+    max_num_seqs: 64
+    gpu_memory_utilization: 0.7
+    
+  production:
+    description: "生产环境"
+    max_model_len: 8192
+    max_num_seqs: 256
+    gpu_memory_utilization: 0.85
+    
+  high_throughput:
+    description: "高吞吐量场景"
+    max_model_len: 2048
+    max_num_seqs: 512
+    gpu_memory_utilization: 0.9
+    
+  long_context:
+    description: "长上下文场景"
+    max_model_len: 32768
+    max_num_seqs: 32
+    gpu_memory_utilization: 0.8
+
+# API配置
+api_settings:
+  host: "0.0.0.0"
+  port: 8000
+  log_level: "info"
+  timeout_keep_alive: 5
+  max_concurrent_requests: 1000
+  
+# 监控配置
+monitoring:
+  enable_metrics: true
+  metrics_port: 8001
+  log_requests: true
+  log_responses: false
