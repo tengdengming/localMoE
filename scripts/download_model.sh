@@ -29,7 +29,7 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# 默认配置
+# 默认配置  
 MODEL_NAME="Qwen/Qwen1.5-MoE-A2.7B-Chat"
 TARGET_DIR="models"
 RESUME_DOWNLOAD=true
