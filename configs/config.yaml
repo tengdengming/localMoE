@@ -52,10 +52,10 @@ inference:
 
 # vLLM配置 - 针对L40S优化
 vllm:
-  model_name: "microsoft/DialoGPT-medium"
+  model_name: "deepseek-ai/deepseek-32b-chat"
   tensor_parallel_size: 4
   gpu_memory_utilization: 0.85  # L40S保守内存使用率
-  max_model_len: 4096           # 增加序列长度
+  max_model_len: 8192           # 增加序列长度
   block_size: 32                # 增大块大小，适合L40S内存带宽
   swap_space: 8                 # 增加交换空间
   max_num_batched_tokens: 16384 # 增大批处理，利用L40S计算能力

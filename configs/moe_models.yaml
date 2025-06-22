@@ -40,6 +40,18 @@ models:
     dtype: "bfloat16"
     description: "DeepSeek MoE 16B模型，中文友好"
 
+  deepseek-32b:
+    model_name: "deepseek-ai/deepseek-32b-chat"
+    model_size: "~60GB"
+    recommended_gpus: 4
+    tensor_parallel_size: 4
+    pipeline_parallel_size: 1
+    max_model_len: 8192
+    gpu_memory_utilization: 0.85
+    quantization: null
+    dtype: "bfloat16"
+    description: "DeepSeek 32B模型，中文优化，TP4部署"
+
   # Qwen系列
   qwen-moe-a2_7b:
     model_name: "Qwen/Qwen1.5-MoE-A2.7B-Chat"
