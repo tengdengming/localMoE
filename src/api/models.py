@@ -40,12 +40,12 @@ class ModelConfig(BaseModel):
 
 class InferenceRequest(BaseModel):
     """推理请求"""
-    text: Optional[str] = Field(default=None, description="输入文本")
-    code: Optional[str] = Field(default=None, description="输入代码")
-    mode: InferenceMode = Field(default=InferenceMode.AUTO, description="推理模式")
-    sampling_params: Optional[SamplingParams] = Field(default=None, description="采样参数")
-    model_config: Optional[ModelConfig] = Field(default=None, description="模型配置")
-    request_id: Optional[str] = Field(default=None, description="请求ID")
+    text: Optional[str] = None
+    code: Optional[str] = None
+    mode: InferenceMode = InferenceMode.AUTO
+    sampling_params: Optional[SamplingParams] = None
+    model_config: Optional[ModelConfig] = None
+    request_id: Optional[str] = None
     
     @model_validator(mode='after')
     def validate_input_and_mode(self):
