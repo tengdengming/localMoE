@@ -30,7 +30,7 @@ log_error() {
 }
 
 # 默认配置
-MODEL_NAME="deepseek-ai/deepseek-32b-chat"
+MODEL_NAME="Qwen/Qwen1.5-MoE-A2.7B-Chat"
 TARGET_DIR="models"
 RESUME_DOWNLOAD=true
 SKIP_LFS=false

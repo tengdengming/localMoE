@@ -52,7 +52,7 @@ inference:
 
 # vLLM配置 - 针对L40S优化
 vllm:
-  model_name: "deepseek-ai/deepseek-32b-chat"
+  model_name: "Qwen/Qwen1.5-MoE-A2.7B-Chat"
   tensor_parallel_size: 4
   gpu_memory_utilization: 0.85  # L40S保守内存使用率
   max_model_len: 8192           # 增加序列长度
