@@ -6,6 +6,17 @@
 echo "📦 安装vLLM MoE模型部署依赖包"
 echo "============================="
 
+# 安装系统依赖
+echo ""
+echo "🛠️ 安装系统依赖..."
+apt-get update
+apt-get install -y git git-lfs wget curl
+
+# 检查Git LFS
+echo ""
+echo "🔍 检查Git LFS..."
+git lfs install
+
 # 激活虚拟环境
 if [ -n "$VIRTUAL_ENV" ]; then
     echo "✅ 虚拟环境已激活: $VIRTUAL_ENV"
