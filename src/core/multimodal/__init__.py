@@ -6,7 +6,7 @@
 from .text_processor import TextProcessor, TextConfig
 from .code_processor import CodeProcessor, CodeConfig
 from .multimodal_fusion import MultimodalFusion, FusionConfig
-from .feature_extractor import FeatureExtractor
+from .feature_extractor import FeatureExtractor, FeatureExtractorConfig
 
 __all__ = [
     "TextProcessor",
@@ -15,5 +15,6 @@ __all__ = [
     "CodeConfig",
     "MultimodalFusion",
     "FusionConfig",
-    "FeatureExtractor"
+    "FeatureExtractor",
+    "FeatureExtractorConfig"
 ]
