@@ -44,7 +44,7 @@ class InferenceRequest(BaseModel):
     code: Optional[str] = None
     mode: InferenceMode = InferenceMode.AUTO
     sampling_params: Optional[SamplingParams] = None
-    model_config: Optional[ModelConfig] = None
+    model_settings: Optional[ModelConfig] = None
     request_id: Optional[str] = None
     
     @model_validator(mode='after')
@@ -53,6 +53,7 @@ class InferenceRequest(BaseModel):
         text = self.text
         code = self.code
         mode = self.mode
+        model_settings = self.model_settings
 
         # 验证至少有一个输入
         if not text and not code:
