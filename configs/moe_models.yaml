@@ -65,6 +65,18 @@ models:
     dtype: "bfloat16"
     description: "Qwen MoE A2.7B模型，轻量级选择"
 
+  qwen3-30b-a3b:
+    model_name: "Qwen/Qwen3-30B-A3B"
+    model_size: "~60GB"
+    recommended_gpus: 2
+    tensor_parallel_size: 2
+    pipeline_parallel_size: 1
+    max_model_len: 32768
+    gpu_memory_utilization: 0.80
+    quantization: null
+    dtype: "bfloat16"
+    description: "Qwen3 30B-A3B MoE模型，高性能大模型"
+
   # Switch Transformer (实验性)
   switch-base:
     model_name: "google/switch-base-8"
