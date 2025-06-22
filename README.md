@@ -54,14 +54,31 @@ LocalMoE/
 
 ## 快速开始
 
+### 安装依赖
 ```bash
-# 安装依赖
 pip install -r requirements.txt
+```
 
-# 启动服务
+### 模型下载
+```bash
+# 安装aria2下载工具
+sudo apt install aria2  # Linux
+brew install aria2      # macOS
+
+# 使用aria2下载模型 (需要Hugging Face Token)
+python scripts/download_model_aria2.py Qwen/Qwen3-30B-A3B --token YOUR_HF_TOKEN
+
+# 或者使用简单下载脚本
+python scripts/download_model_simple.py Qwen/Qwen3-30B-A3B --token YOUR_HF_TOKEN
+```
+
+### 启动服务
+```bash
 python -m src.api.main
+```
 
-# 健康检查
+### 健康检查
+```bash
 curl http://localhost:8000/health
 ```
 
