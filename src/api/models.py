@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Dict, List, Optional, Any, Union
 from enum import Enum
 import time
+from datetime import datetime
 
 
 class InferenceMode(str, Enum):
@@ -14,15 +15,16 @@ class InferenceMode(str, Enum):
     TEXT_ONLY = "text_only"
     CODE_ONLY = "code_only"
     MULTIMODAL = "multimodal"
+    AUTO = "auto"
 
 
 class SamplingParams(BaseModel):
     """采样参数"""
-    temperature: float = Field(default=0.8, ge=0.0, le=2.0, description="采样温度")
-    top_p: float = Field(default=0.95, ge=0.0, le=1.0, description="nucleus sampling参数")
-    top_k: int = Field(default=50, ge=1, le=100, description="top-k sampling参数")
-    max_tokens: int = Field(default=512, ge=1, le=2048, description="最大生成token数")
-    repetition_penalty: float = Field(default=1.1, ge=1.0, le=2.0, description="重复惩罚")
+    temperature: float = Field(default=0.8, description="采样温度")
+    top_p: float = Field(default=0.95, description="nucleus sampling参数")
+    top_k: int = Field(default=50, description="top-k sampling参数")
+    max_tokens: int = Field(default=512, description="最大生成token数")
+    repetition_penalty: float = Field(default=1.1, description="重复惩罚")
     do_sample: bool = Field(default=True, description="是否使用采样")
     stream: bool = Field(default=False, description="是否流式输出")
 
@@ -30,7 +32,7 @@ class SamplingParams(BaseModel):
 class ModelConfig(BaseModel):
     """模型配置"""
     use_moe: bool = Field(default=True, description="是否使用MoE")
-    top_k_experts: int = Field(default=2, ge=1, le=8, description="激活的专家数量")
+    top_k_experts: int = Field(default=2, description="激活的专家数量")
     expert_selection_strategy: str = Field(default="adaptive", description="专家选择策略")
     enable_caching: bool = Field(default=True, description="是否启用缓存")
     quantization: Optional[str] = Field(default=None, description="量化类型")
@@ -40,7 +42,7 @@ class InferenceRequest(BaseModel):
     """推理请求"""
     text: Optional[str] = Field(default=None, description="输入文本")
     code: Optional[str] = Field(default=None, description="输入代码")
-    mode: InferenceMode = Field(default=InferenceMode.MULTIMODAL, description="推理模式")
+    mode: InferenceMode = Field(default=InferenceMode.AUTO, description="推理模式")
     sampling_params: Optional[SamplingParams] = Field(default=None, description="采样参数")
     model_config: Optional[ModelConfig] = Field(default=None, description="模型配置")
     request_id: Optional[str] = Field(default=None, description="请求ID")
@@ -63,6 +65,7 @@ class InferenceRequest(BaseModel):
             raise ValueError("CODE_ONLY模式需要提供code")
         if mode == InferenceMode.MULTIMODAL and not (text and code):
             raise ValueError("MULTIMODAL模式需要同时提供text和code")
+        # AUTO模式会自动根据输入选择合适的模式
 
         return self
 
