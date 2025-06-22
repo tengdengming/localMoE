@@ -323,24 +323,55 @@ class ModelDownloader:
         # 下载所有文件
         success_count = 0
         total_files = len(files)
-        
+
         self.log("PROGRESS", f"Downloading {total_files} files...")
-        
-        for i, file_info in enumerate(files, 1):
-            self.log("PROGRESS", f"[{i}/{total_files}] Processing {file_info['path']}")
-            
+
+        # 按文件大小排序，先下载小文件，再下载大文件
+        files_sorted = sorted(files, key=lambda x: x.get('size', 0))
+
+        for i, file_info in enumerate(files_sorted, 1):
+            file_path = file_info['path']
+            file_size = file_info.get('size', 0)
+
+            self.log("PROGRESS", f"[{i}/{total_files}] {file_path} ({self._format_size(file_size)})")
+
+            # 检查文件是否已存在且大小正确
+            local_file = model_dir / file_path
+            if local_file.exists():
+                local_size = local_file.stat().st_size
+                if local_size == file_size:
+                    self.log("SUCCESS", f"File already exists and complete: {file_path}")
+                    success_count += 1
+                    continue
+                else:
+                    self.log("WARNING", f"File exists but size mismatch: {file_path} (local: {local_size}, expected: {file_size})")
+
+            # 下载文件
             if self.download_file_aria2(file_info, model_dir):
                 success_count += 1
+
+                # 验证下载的文件大小
+                if local_file.exists():
+                    actual_size = local_file.stat().st_size
+                    if actual_size != file_size and file_size > 0:
+                        self.log("WARNING", f"Downloaded file size mismatch: {file_path}")
+                        self.log("WARNING", f"Expected: {file_size}, Got: {actual_size}")
+                    else:
+                        self.log("SUCCESS", f"Downloaded and verified: {file_path}")
             else:
-                self.log("WARNING", f"Failed to download {file_info['path']}")
-                
+                self.log("ERROR", f"Failed to download {file_path}")
+
         # 下载结果
         if success_count == total_files:
             self.log("SUCCESS", f"All {total_files} files downloaded successfully!")
             return True
         elif success_count > 0:
             self.log("WARNING", f"Downloaded {success_count}/{total_files} files")
-            return True
+            # 如果下载了大部分文件，仍然认为是成功的
+            if success_count / total_files >= 0.8:
+                self.log("INFO", "Download mostly successful (80%+ files)")
+                return True
+            return False
         else:
             self.log("ERROR", "No files were downloaded successfully")
             return False
