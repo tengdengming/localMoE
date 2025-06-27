@@ -61,15 +61,13 @@ pip install -r requirements.txt
 
 ### 模型下载
 ```bash
-# 安装aria2下载工具
-sudo apt install aria2  # Linux
-brew install aria2      # macOS
+# 使用huggingface_hub下载模型 (需要Hugging Face Token)
+from huggingface_hub import snapshot_download
+snapshot_download(repo_id="Qwen/Qwen3-30B-A3B", token="YOUR_HF_TOKEN", local_dir="models/Qwen3-30B-A3B")
 
-# 使用aria2下载模型 (需要Hugging Face Token)
-python scripts/download_model_aria2.py Qwen/Qwen3-30B-A3B --token YOUR_HF_TOKEN
-
-# 或者使用简单下载脚本
-python scripts/download_model_simple.py Qwen/Qwen3-30B-A3B --token YOUR_HF_TOKEN
+# 或者直接使用git lfs (需要安装git-lfs)
+git lfs install
+git clone https://huggingface.co/Qwen/Qwen3-30B-A3B models/Qwen3-30B-A3B
 ```
 
 ### 启动服务

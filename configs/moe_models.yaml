@@ -77,6 +77,19 @@ models:
     dtype: "bfloat16"
     description: "Qwen3 30B-A3B MoE模型，高性能大模型"
 
+  # 新增 Qwen2.5-VL-72B-Instruct 配置
+  qwen2.5-vl-72b:
+    model_name: "Qwen/Qwen2.5-VL-72B-Instruct"
+    model_size: "~72GB"
+    recommended_gpus: 4
+    tensor_parallel_size: 4
+    pipeline_parallel_size: 1
+    max_model_len: 8192 # 假设一个合理的上下文长度，可根据实际需求调整
+    gpu_memory_utilization: 0.85 # 假设一个合理的GPU内存利用率
+    quantization: null
+    dtype: "bfloat16" # 假设使用bfloat16，可根据实际模型文件调整
+    description: "Qwen2.5-VL-72B-Instruct 多模态模型，四张L40S卡部署"
+
   # Switch Transformer (实验性)
   switch-base:
     model_name: "google/switch-base-8"
