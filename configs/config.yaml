@@ -29,7 +29,7 @@ model:
 
 # 推理配置
 inference:
-  preferred_engine: "auto"
+  preferred_engine: "vllm"
   enable_fallback: true
   enable_load_balancing: true
   max_concurrent_requests: 100
